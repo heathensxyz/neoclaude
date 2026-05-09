@@ -1,0 +1,6 @@
+.pio/
+data/
+waveshare-examples/
+.vscode/
+__pycache__/
+*.pyc
