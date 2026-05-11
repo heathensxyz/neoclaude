@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
-"""Convert Hendo sprite sheets to RGB565 binary files for ESP32 LittleFS."""
+"""Convert sprite sheets to RGB565 binary files for ESP32 LittleFS.
+
+Works with any sprite sheet that uses a standard 8-column x 9-row grid
+with 192x208 pixel frames. Any sprite sheet matching this layout will work.
+
+Usage:
+    python3 convert_sprites.py <spritesheet.png> <output_dir> [--name label]
+
+Example:
+    python3 convert_sprites.py ~/Downloads/pumpy/spritesheet.webp data/p --name Pumpy
+"""
 
 import struct
 import os
 import sys
+import argparse
 from PIL import Image
 import numpy as np
 
@@ -16,14 +27,18 @@ ANIM_NAMES = ['idle', 'run_r', 'run_l', 'wave', 'jump', 'sad', 'wait', 'work', '
 ANIM_PREFIXES = ['i', 'rr', 'rl', 'w', 'j', 's', 'wt', 'wk', 'th']
 
 
-def rgb565(r, g, b):
-    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
-
-
-def convert_sheet(input_path, output_dir, prefix):
+def convert_sheet(input_path, output_dir):
     img = Image.open(input_path).convert('RGBA')
-    arr = np.array(img)
+    w, h = img.size
 
+    expected_w = COLS * FRAME_W
+    expected_h = ROWS * FRAME_H
+    if w != expected_w or h != expected_h:
+        print(f"Warning: expected {expected_w}x{expected_h}, got {w}x{h}")
+        print(f"Sprite sheet should be an {COLS}x{ROWS} grid of {FRAME_W}x{FRAME_H} frames.")
+        sys.exit(1)
+
+    arr = np.array(img)
     os.makedirs(output_dir, exist_ok=True)
     total_frames = 0
     manifest = []
@@ -74,26 +89,21 @@ def convert_sheet(input_path, output_dir, prefix):
 
 
 def main():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
-    data_dir = os.path.join(project_dir, "data")
+    parser = argparse.ArgumentParser(
+        description='Convert sprite sheets to RGB565 binary files for ESP32')
+    parser.add_argument('spritesheet', help='Path to sprite sheet image (PNG or WebP)')
+    parser.add_argument('output_dir', help='Output directory for binary frames (e.g., data/p)')
+    parser.add_argument('--name', default=None, help='Display name for the pet (for logging)')
+    args = parser.parse_args()
 
-    gemini_path = os.path.expanduser("~/Desktop/hendo_gemini_v3.png")
-    duo_path = os.path.expanduser("~/Desktop/hendo_duo_v1.png")
-
-    if not os.path.exists(gemini_path) or not os.path.exists(duo_path):
-        print("Sprite sheets not found on Desktop.")
-        print(f"  Expected: {gemini_path}")
-        print(f"  Expected: {duo_path}")
+    if not os.path.exists(args.spritesheet):
+        print(f"File not found: {args.spritesheet}")
         sys.exit(1)
 
-    print(f"Converting gemini sprites...")
-    convert_sheet(gemini_path, os.path.join(data_dir, "g"), "gemini")
-
-    print(f"\nConverting duo sprites...")
-    convert_sheet(duo_path, os.path.join(data_dir, "d"), "duo")
-
-    print(f"\nSprite data written to {data_dir}")
+    label = args.name or os.path.basename(os.path.dirname(args.spritesheet)) or "pet"
+    print(f"Converting {label} sprites from {args.spritesheet}...")
+    convert_sheet(args.spritesheet, args.output_dir)
+    print(f"\nBinary frames written to {args.output_dir}")
     print("Upload to ESP32 with: pio run -t uploadfs")
 
 

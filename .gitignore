@@ -4,3 +4,6 @@ waveshare-examples/
 .vscode/
 __pycache__/
 *.pyc
+include/wifi_config.h
+sprites-backup/
+.DS_Store
